@@ -23,6 +23,9 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="src\tracker.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="src\motionMaster.py">
       <SubType>Code</SubType>
     </Compile>
@@ -33,7 +36,6 @@
     <Compile Include="run.py">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="__init__.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="src\" />

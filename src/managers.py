@@ -32,9 +32,6 @@ class CaptureManager(object):
 			self._channel = value
 			self._frame = None
 
-	def isWritingVideo(self):
-		return self._videoFilename is None
-
 	def enterFrame(self):
 		"""Used to obtain a new frame"""
 		assert not self._enteredFrame, 'no exitFrame for enterFrame'
@@ -51,16 +48,18 @@ class CaptureManager(object):
 			timeElapsed = time.time() - self._startTime
 			self._fpsEstimate = self._framesElapsed / timeElapsed
 			self._framesElapsed += 1
+
+		if self._videoFilename != None:
+			self.writeVideoFrame()
+
 		# Display the window (mirrored or not) 
 		if self.previewWindowManager is not None:
 			if self.shouldMirrorPreview:
-				mirroredFrame = numpy.fliplr(self._frame)
+				mirroredFrame = cv2.flip(self._frame, 1)
 				self.previewWindowManager.show(mirroredFrame)
 			else:
 				self.previewWindowManager.show(self._frame)
-		# Used to write to a video file 
-		if self.isWritingVideo:
-			self.writeVideoFrame
+
 		# Release the frame for next use 
 		self._frame = None
 		self._enteredFrame = False
@@ -69,6 +68,8 @@ class CaptureManager(object):
 		"""simplying sets the filename and encoding"""
 		self._videoFilename = filename
 		self._videoEncoding = encoding
+		size = (int(self._capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self._capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+		self._videoWriter = cv2.VideoWriter(self._videoFilename, self._videoEncoding, 30, size)
 
 	def stopWritingVideo(self):
 		self._videoFilename = None
@@ -76,20 +77,8 @@ class CaptureManager(object):
 		self._videoWriter = None 
 
 	def writeVideoFrame(self):
-		"""Writes current frame to the video file"""
-		if not self.isWritingVideo:
-			return
-		if self._videoWriter is None:
-			fps = self._capture.get(cv2.CAP_PROP_FPS)
-			if fps <= 0.0:
-				if self._framesElapsed < 20:
-					return
-		else:
-			fps = self._fpsEstimate
-		size = (int(self._capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self._capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-		self._videoWriter = cv2.VideoWriter(self._videoFilename, self._videoEncoding, fps, size)
 		self._videoWriter.write(self._frame)
-
+		
 class WindowManager(object):
 	"""An abstraction used to manage the creation, display, keyboard controls, and termination of a cv2 window"""
 	def __init__(self, windowName, keypressCallback = None):
