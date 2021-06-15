@@ -25,14 +25,20 @@ class MotionMaster(object):
                     self._tracker.registerGrayFrame(frame)
                     if self._firstTrackingFrame:
                         self._firstTrackingFrame = False 
-                        self._tracker.getFirstKeyPoints(frame)
+                        self._tracker.getFirstKeyPoints(frame)                   
                     else:
-                        self._tracker.getOpticalFlowPoints()
-                        drawn_img = self._tracker.drawMotionLines(frame.copy())
+                        r = self._tracker.getOpticalFlowPoints()
+                        if not r:
+                            self._firstTrackingFrame = True
+                            continue
+                        drawn_img = self._tracker.processMotionDirections(frame.copy(), True)
                         self._tracker.updatePrevIteration()
                         if drawn_img is not None:
                             drawn_img = cv2.flip(drawn_img, 1)
                             cv2.imshow('drawn image', drawn_img)
+
+                        if self._captureManager.framesElapsed() % self._tracker.getDetectInterval() == 0: # update the tracking points 
+                            self._firstTrackingFrame = True
             #############################################################
             self._captureManager.exitFrame()
             cv2.waitKey(1)

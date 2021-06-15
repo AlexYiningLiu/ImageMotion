@@ -17,9 +17,10 @@ class Tracker(object):
         self._gray_frame = None 
         self._prev_points = None
         self._points = None 
-        self._mask = None 
+        self._mask = None
         self._good_prev = None
         self._good_new = None
+        self._detect_interval = 20
 
     def getFirstKeyPoints(self, frame):
         """Takes first frame and find corners in it"""
@@ -42,18 +43,43 @@ class Tracker(object):
         if self._points is not None:
             self._good_new = self._points[st==1]
             self._good_prev = self._prev_points[st==1]
+            return True 
         else:
-            print("No points detected at all")
+            print("No detection, redetect")
+            return False 
 
-    def drawMotionLines(self, frame):
+    def processMotionDirections(self, frame, draw = False):
         """Draw motion lines based on optical flow tracking"""
         drawn_img = None
+        average_dx = 0
+        average_dy = 0 
         if self._good_new is not None:
             for i, (new, old) in enumerate(zip(self._good_new, self._good_prev)): 
                 a, b = new.ravel()
                 c, d = old.ravel()
-                self._mask = cv2.line(self._mask, (int(a),int(b)),(int(c),int(d)), self._color[i].tolist(), 2)
-                frame = cv2.circle(frame,(int(a),int(b)),5, self._color[i].tolist(),-1)
-            drawn_img = cv2.add(frame, self._mask)
+                average_dx += (a-c)
+                average_dy += (b-d)
+                if draw:
+                    self._mask = cv2.line(self._mask, (int(a),int(b)),(int(c),int(d)), self._color[i].tolist(), 2)
+                    frame = cv2.circle(frame,(int(a),int(b)),5, self._color[i].tolist(),-1)
+            if draw:
+                drawn_img = cv2.add(frame, self._mask)
+
+            if average_dy < 0:
+                print("DOWN")
+            else:
+                print("UP")
+            if average_dx < 0:
+                print("RIGHT")
+            else:
+                print("LEFT")
+        else:
+            print("good_new is None")
+
         return drawn_img
+
+    def getDetectInterval(self):
+        return self._detect_interval
+
+        
 

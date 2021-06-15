@@ -11,7 +11,6 @@ class CaptureManager(object):
 		self.previewWindowManager = previewWindowManager
 		self.shouldMirrorPreview = shouldMirrorPreview
 		self._capture = capture
-		self._channel = 0
 		self._enteredFrame = False
 		self._frame = None
 		self._videoFilename = None
@@ -24,13 +23,8 @@ class CaptureManager(object):
 	def frame(self):
 		return self._frame
 
-	def channel(self):
-		return self._channel
-
-	def channel(self, value):
-		if self._channel != value:
-			self._channel = value
-			self._frame = None
+	def framesElapsed(self):
+		return self._framesElapsed
 
 	def enterFrame(self):
 		"""Used to obtain a new frame"""
