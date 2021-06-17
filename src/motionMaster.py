@@ -31,8 +31,11 @@ class MotionMaster(object):
                         if not r:
                             self._firstTrackingFrame = True
                             continue
-                        drawn_img = self._tracker.processMotionDirections(frame.copy(), True)
-                        self._tracker.updatePrevIteration()
+                        if self._captureManager.framesElapsed() % 50 == 0:
+                            drawn_img = self._tracker.processMotionDirections(frame.copy(), True)
+                            self._tracker.updatePrevIteration()
+                        else:
+                            drawn_img = frame.copy()
                         if drawn_img is not None:
                             drawn_img = cv2.flip(drawn_img, 1)
                             cv2.imshow('drawn image', drawn_img)

@@ -1,5 +1,6 @@
 import cv2 
 import numpy as np 
+import math 
 
 class Tracker(object):
     """Encapsulates all functionalities related to keypoint motion tracking"""
@@ -20,7 +21,7 @@ class Tracker(object):
         self._mask = None
         self._good_prev = None
         self._good_new = None
-        self._detect_interval = 20
+        self._detect_interval = 100
 
     def getFirstKeyPoints(self, frame):
         """Takes first frame and find corners in it"""
@@ -53,26 +54,38 @@ class Tracker(object):
         drawn_img = None
         average_dx = 0
         average_dy = 0 
+        average_angle = 0
         if self._good_new is not None:
+            counter = 0 
             for i, (new, old) in enumerate(zip(self._good_new, self._good_prev)): 
+                #if counter > 10:
+                #    break
                 a, b = new.ravel()
                 c, d = old.ravel()
-                average_dx += (a-c)
-                average_dy += (b-d)
+                average_dx += (a-c) 
+                average_dy += (b-d) 
                 if draw:
                     self._mask = cv2.line(self._mask, (int(a),int(b)),(int(c),int(d)), self._color[i].tolist(), 2)
                     frame = cv2.circle(frame,(int(a),int(b)),5, self._color[i].tolist(),-1)
             if draw:
                 drawn_img = cv2.add(frame, self._mask)
+            
+            if average_dx != 0:
+                average_angle = math.atan(average_dy/average_dx)
 
-            if average_dy < 0:
-                print("DOWN")
-            else:
-                print("UP")
-            if average_dx < 0:
-                print("RIGHT")
-            else:
-                print("LEFT")
+            if average_dx > 0.1 or average_dy > 0.1:
+                self.drawArrow(drawn_img, average_angle)
+
+            #print(average_angle)
+
+            #if average_dy < 0:
+            #    print("DOWN")
+            #else:
+            #    print("UP")
+            #if average_dx < 0:
+            #    print("RIGHT")
+            #else:
+            #    print("LEFT")
         else:
             print("good_new is None")
 
@@ -80,6 +93,19 @@ class Tracker(object):
 
     def getDetectInterval(self):
         return self._detect_interval
+
+    def drawArrow(self, frame, average_angle):
+        arrow_length = 100
+        start_point = (int(frame.shape[1]/2), int(frame.shape[0]/2))   
+        if average_angle > 0:
+            end_point = (start_point[0] - int(arrow_length*math.cos(average_angle)), start_point[1]-int(arrow_length*math.sin(average_angle)))  
+        else:
+            end_point = (start_point[0] + int(arrow_length*math.cos(average_angle)), start_point[1]-int(arrow_length*math.sin(average_angle)))  
+
+        #print(end_point)
+        color = (0, 255, 0)   
+        thickness = 6
+        frame = cv2.arrowedLine(frame, start_point, end_point, color, thickness) 
 
         
 
