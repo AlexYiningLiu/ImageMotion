@@ -22,6 +22,11 @@ class Tracker(object):
         self._good_prev = None
         self._good_new = None
         self._detect_interval = 100
+        self._update_interval = 10
+        self._total_dx = 0
+        self._total_dy = 0 
+        self._angle = 0 
+     
 
     def getFirstKeyPoints(self, frame):
         """Takes first frame and find corners in it"""
@@ -49,11 +54,9 @@ class Tracker(object):
             print("No detection, redetect")
             return False 
 
-    def processMotionDirections(self, frame, draw = False):
+    def processMotionDirections(self, frame, framesElapsed, draw = False):
         """Draw motion lines based on optical flow tracking"""
         drawn_img = None
-        average_dx = 0
-        average_dy = 0 
         average_angle = 0
         if self._good_new is not None:
             counter = 0 
@@ -62,30 +65,23 @@ class Tracker(object):
                 #    break
                 a, b = new.ravel()
                 c, d = old.ravel()
-                average_dx += (a-c) 
-                average_dy += (b-d) 
+                self._total_dx += (a-c) 
+                self._total_dy += (b-d) 
                 if draw:
-                    self._mask = cv2.line(self._mask, (int(a),int(b)),(int(c),int(d)), self._color[i].tolist(), 2)
+                    #self._mask = cv2.line(self._mask, (int(a),int(b)),(int(c),int(d)), self._color[i].tolist(), 2)
                     frame = cv2.circle(frame,(int(a),int(b)),5, self._color[i].tolist(),-1)
             if draw:
                 drawn_img = cv2.add(frame, self._mask)
+
+            if self._total_dx > 5 or self._total_dy > 5:
+                self.drawArrow(drawn_img, self._angle)
             
-            if average_dx != 0:
-                average_angle = math.atan(average_dy/average_dx)
+            if framesElapsed % self._update_interval == 0:
+                if self._total_dx != 0:
+                    self._angle = math.atan(self._total_dy/self._total_dx)
+                self._total_dx = 0 
+                self._total_dy = 0 
 
-            if average_dx > 0.1 or average_dy > 0.1:
-                self.drawArrow(drawn_img, average_angle)
-
-            #print(average_angle)
-
-            #if average_dy < 0:
-            #    print("DOWN")
-            #else:
-            #    print("UP")
-            #if average_dx < 0:
-            #    print("RIGHT")
-            #else:
-            #    print("LEFT")
         else:
             print("good_new is None")
 

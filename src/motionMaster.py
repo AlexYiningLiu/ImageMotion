@@ -30,9 +30,10 @@ class MotionMaster(object):
                         r = self._tracker.getOpticalFlowPoints()
                         if not r:
                             self._firstTrackingFrame = True
+                            self._captureManager.exitFrame()
                             continue
                         if self._captureManager.framesElapsed() % 50 == 0:
-                            drawn_img = self._tracker.processMotionDirections(frame.copy(), True)
+                            drawn_img = self._tracker.processMotionDirections(frame.copy(), self._captureManager.framesElapsed(), True)
                             self._tracker.updatePrevIteration()
                         else:
                             drawn_img = frame.copy()
@@ -40,8 +41,8 @@ class MotionMaster(object):
                             drawn_img = cv2.flip(drawn_img, 1)
                             cv2.imshow('drawn image', drawn_img)
 
-                        if self._captureManager.framesElapsed() % self._tracker.getDetectInterval() == 0: # update the tracking points 
-                            self._firstTrackingFrame = True
+                        #if self._captureManager.framesElapsed() % self._tracker.getDetectInterval() == 0: # update the tracking points 
+                        #    self._firstTrackingFrame = True
             #############################################################
             self._captureManager.exitFrame()
             cv2.waitKey(1)
