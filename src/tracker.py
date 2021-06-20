@@ -1,5 +1,8 @@
+# Referenced: Programming Computer Vision with Python: Tools and Algorithms for Analyzing Images by Jan Erik Solem
+
 import cv2 
 import numpy as np 
+from scipy import stats
 import math 
 
 class Tracker(object):
@@ -26,77 +29,85 @@ class Tracker(object):
         self._total_dx = 0
         self._total_dy = 0 
         self._angle = 0 
+        self._angle_multiple = 30 
+        #self._possible_angles = np.arange(-180, 210, self._angle_multiple)
      
-
-    def getFirstKeyPoints(self, frame):
-        """Takes first frame and find corners in it"""
-        # find N strongest corners in the image by Shi-Tomasi method, unpack feature_params as arguments 
-        self._prev_gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        self._prev_points = cv2.goodFeaturesToTrack(self._prev_gray_frame, mask=None, **self._feature_params)
-        self._mask = np.zeros_like(frame)
-
     def registerGrayFrame(self, frame):
-        self._gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        self._prev_gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     def updatePrevIteration(self):
-        self._prev_gray_frame = self._gray_frame.copy()
-        self._prev_points = self._good_new.reshape(-1, 1, 2)
+        self._prev_gray_frame = self._gray_frame
 
     def getOpticalFlowPoints(self):
-        """Obtain results of optical flow tracked points"""
-        self._points, st, err = cv2.calcOpticalFlowPyrLK(self._prev_gray_frame, self._gray_frame, self._prev_points, None, **self._lk_params)
-        # select good points 
-        if self._points is not None:
-            self._good_new = self._points[st==1]
-            self._good_prev = self._prev_points[st==1]
-            return True 
-        else:
-            print("No detection, redetect")
-            return False 
+        """Obtain results of optical flow"""
+        # return a 2 channel image called 'flow'
+        flow = cv2.calcOpticalFlowFarneback(self._prev_gray_frame, self._gray_frame, None, 0.5, 2, 40, 2, 5, 1.5, 0)
+        return flow
 
     def processMotionDirections(self, frame, framesElapsed, draw = False):
         """Draw motion lines based on optical flow tracking"""
-        drawn_img = None
-        average_angle = 0
-        if self._good_new is not None:
-            counter = 0 
-            for i, (new, old) in enumerate(zip(self._good_new, self._good_prev)): 
-                #if counter > 10:
-                #    break
-                a, b = new.ravel()
-                c, d = old.ravel()
-                self._total_dx += (a-c) 
-                self._total_dy += (b-d) 
-                if draw:
-                    #self._mask = cv2.line(self._mask, (int(a),int(b)),(int(c),int(d)), self._color[i].tolist(), 2)
-                    frame = cv2.circle(frame,(int(a),int(b)),5, self._color[i].tolist(),-1)
-            if draw:
-                drawn_img = cv2.add(frame, self._mask)
+        self._gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        #if framesElapsed % self._update_interval == 0:
+        average_angle, lines = self.getTrajectoryAngle(self.getOpticalFlowPoints())  
+        print(average_angle)
+        if draw:
+            self.drawPoints(frame, lines)
+        self.drawArrow(frame, average_angle)
+        return frame
 
-            if self._total_dx > 5 or self._total_dy > 5:
-                self.drawArrow(drawn_img, self._angle)
-            
-            if framesElapsed % self._update_interval == 0:
-                if self._total_dx != 0:
-                    self._angle = math.atan(self._total_dy/self._total_dx)
-                self._total_dx = 0 
-                self._total_dy = 0 
+    def getTrajectoryAngle(self, flow):
+        angles = []
+        step = 32
+        h, w = self._gray_frame.shape[:2]
+        y,x = np.mgrid[step/2:h:step,step/2:w:step].reshape(2,-1).astype(int)
+        fx,fy = flow[y,x].T
 
+        # lines between all optical flow points, defined by their endpoints 
+        lines = np.vstack([x, y, x+fx, y+fy]).T.reshape(-1, 2, 2)
+        lines = np.int32(lines + 0.5)
+
+        for (x1, y1), (x2, y2) in lines:
+            if y2!=y1 or x2!=x1:
+                angles.append(round(math.atan2(- int(y2) + int(y1), int(x2) - int(x1)) * 180 / np.pi))
+        angles = np.array(angles)
+        vals, counts = np.unique(angles, return_counts=True)
+        index = np.argmax(counts)
+        mode_angle = angles[index]
+        mode_angle = self._roundAngle(mode_angle)
+        #return np.mean(angles), lines
+        return mode_angle, lines
+
+    def _roundAngle(self, angle):
+        if self._angle_multiple == 0:
+            return angle
+        remainder = abs(angle) % self._angle_multiple
+        if remainder == 0:
+            return angle
+        if angle < 0:
+            return -(abs(angle) - self._angle_multiple - remainder)
         else:
-            print("good_new is None")
-
-        return drawn_img
+            return angle + self._angle_multiple - remainder 
 
     def getDetectInterval(self):
         return self._detect_interval
 
+    def drawPoints(self, frame, lines):
+        for (x1, y1), (x2, y2) in lines:
+            cv2.line(frame,(x1,y1),(x2,y2),(255,0,0),1)
+            cv2.circle(frame, (x1, y1), 1, (255, 0, 0), -1)
+
     def drawArrow(self, frame, average_angle):
+        average_angle = math.radians(average_angle)
         arrow_length = 100
         start_point = (int(frame.shape[1]/2), int(frame.shape[0]/2))   
-        if average_angle > 0:
-            end_point = (start_point[0] - int(arrow_length*math.cos(average_angle)), start_point[1]-int(arrow_length*math.sin(average_angle)))  
-        else:
-            end_point = (start_point[0] + int(arrow_length*math.cos(average_angle)), start_point[1]-int(arrow_length*math.sin(average_angle)))  
+        try:
+            if average_angle > 0:
+                end_point = (start_point[0] + int(arrow_length*math.cos(average_angle)), start_point[1]+int(arrow_length*math.sin(average_angle)))  
+            else:
+                end_point = (start_point[0] - int(arrow_length*math.cos(average_angle)), start_point[1]+int(arrow_length*math.sin(average_angle)))  
+        except:
+            print("NaN error?")
+            return
 
         #print(end_point)
         color = (0, 255, 0)   
