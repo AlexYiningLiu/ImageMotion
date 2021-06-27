@@ -1,4 +1,3 @@
-
 # Referenced: Learning OpenCV4 Computer Vision with Python by Joseph Howse, Joe Minichino
 
 import cv2 
